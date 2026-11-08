@@ -1383,6 +1383,9 @@ class mjCMesh_ : public mjCBase {
   double quat_[4];   // inertia orientation
   double boxsz_[3];  // half-sizes of equivalent inertia box
   double aamm_[6];   // axis-aligned bounding box in (min, max) format
+    // Conservative plugin field bounds in the original SDF local frame.
+    double sdf_aamm_[6] = {};
+    bool has_sdf_aamm_ = false;
   double volume_;    // volume of the mesh
   double surface_;   // surface of the mesh
 
@@ -1482,6 +1485,7 @@ class mjCMesh : public mjCMesh_, private mjsMesh {
 
   // mesh properties computed by Compile
   const double* aamm() const { return aamm_; }
+  const double* collision_aamm() const { return has_sdf_aamm_ ? sdf_aamm_ : aamm_; }
 
   // number of vertices, normals, texture coordinates, and faces
   int nvert() const { return vert_.size() / 3; }

@@ -4512,7 +4512,7 @@ void mjCGeom::SetInertia(void) {
 // mj_setConst computes from their size
 double mjCGeom::GetRBound(void) {
   if (type != mjGEOM_MESH && type != mjGEOM_SDF) { return 0; }
-  const double* aamm     = mesh->aamm();
+  const double* aamm     = type == mjGEOM_SDF ? mesh->collision_aamm() : mesh->aamm();
   double        haabb[3] = {std::max(std::abs(aamm[0]), std::abs(aamm[3])),
                             std::max(std::abs(aamm[1]), std::abs(aamm[4])),
                             std::max(std::abs(aamm[2]), std::abs(aamm[5]))};
@@ -4551,8 +4551,11 @@ void mjCGeom::ComputeAABB(void) {
       break;
 
     case mjGEOM_MESH:
-    case mjGEOM_SDF:
       mjuu_copyvec(aamm, mesh->aamm(), 6);
+      break;
+
+    case mjGEOM_SDF:
+      mjuu_copyvec(aamm, mesh->collision_aamm(), 6);
       break;
 
     case mjGEOM_PLANE:
@@ -4771,7 +4774,7 @@ void mjCGeom::Compile(void) {
     size[1] = hfield->size[1];
     size[2] = 0.25 * hfield->size[2] + 0.5 * hfield->size[3];
   } else if (type == mjGEOM_MESH || type == mjGEOM_SDF) {
-    const double* aamm = mesh->aamm();
+    const double* aamm = type == mjGEOM_SDF ? mesh->collision_aamm() : mesh->aamm();
 
     size[0] = std::max(std::abs(aamm[0]), std::abs(aamm[3]));
     size[1] = std::max(std::abs(aamm[1]), std::abs(aamm[4]));

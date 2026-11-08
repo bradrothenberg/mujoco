@@ -365,6 +365,7 @@ void mjCMesh::CopyFromSpec() {
   tree_ = mjCBoundingVolumeHierarchy();
   face_aabb_.clear();
   octree_.Clear();
+  has_sdf_aamm_ = false;
   mjuu_setvec(aamm_, 1e10, 1e10, 1e10);
   mjuu_setvec(aamm_ + 3, -1e10, -1e10, -1e10);
 }
@@ -435,6 +436,17 @@ void mjCMesh::LoadSDF() {
 
   mjtNum aabb[6] = {0};
   pplugin->sdf_aabb(aabb, attributes.data());
+  // The generated surface is for visualization and mesh-related model data.
+  // Collision bounds must come from the field provider, because the sampled
+  // surface can omit fine or disconnected features.
+  for (int i = 0; i < 3; ++i) {
+    if (!std::isfinite(aabb[i]) || !std::isfinite(aabb[i + 3]) || aabb[i + 3] <= 0) {
+      throw mjCError(this, "invalid SDF bounds for mesh '%s'", name.c_str());
+    }
+    sdf_aamm_[i] = aabb[i] - aabb[i + 3];
+    sdf_aamm_[i + 3] = aabb[i] + aabb[i + 3];
+  }
+  has_sdf_aamm_ = true;
   mjtNum total = aabb[3] + aabb[4] + aabb[5];
 
   const double n = 300;
@@ -529,6 +541,8 @@ void mjCMesh::CacheMesh(mjCCache* cache, const mjResource* resource) {
   mesh->material_ = material_;
   std::copy(boxsz_, boxsz_ + 3, mesh->boxsz_);
   std::copy(aamm_, aamm_ + 6, mesh->aamm_);
+  mesh->has_sdf_aamm_ = has_sdf_aamm_;
+  std::copy(sdf_aamm_, sdf_aamm_ + 6, mesh->sdf_aamm_);
   std::copy(pos_, pos_ + 3, mesh->pos_);
   std::copy(quat_, quat_ + 4, mesh->quat_);
   int ncenter = face_.size();
@@ -1143,6 +1157,8 @@ bool mjCMesh::LoadCachedMesh(mjCCache* cache, const mjResource* resource) {
     volume_  = mesh->volume_;
     std::copy(mesh->boxsz_, mesh->boxsz_ + 3, boxsz_);
     std::copy(mesh->aamm_, mesh->aamm_ + 6, aamm_);
+    has_sdf_aamm_ = mesh->has_sdf_aamm_;
+    std::copy(mesh->sdf_aamm_, mesh->sdf_aamm_ + 6, sdf_aamm_);
     std::copy(mesh->pos_, mesh->pos_ + 3, pos_);
     std::copy(mesh->quat_, mesh->quat_ + 4, quat_);
 
