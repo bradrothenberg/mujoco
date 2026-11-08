@@ -56,7 +56,8 @@ registered again before the model is reloaded.
 
 ## Correctness checks
 
-The Release CTest suite has three executables. The standalone tests cover
+The Release CTest suite has three executables when the MuJoCo adapter is
+enabled. A standalone-only build has two. The standalone tests cover
 primitive and warped-field gradients, a batched callback with finite
 differences, sphere/sphere and sphere/box-floor contacts at zero gap and in
 penetration, a deeper sphere overlap, cached pair queries, torus contact and
@@ -118,6 +119,10 @@ generated contact use totals over all substeps. They count field-interface
 queries, not the six internal samples used by a finite-difference gradient.
 Peak working set includes process and model setup. Model compilation and shape
 preparation are excluded from step times.
+
+After publication, a clean checkout of the integration branch built the
+standalone library and passed its two tests. The same checkout built the
+adapter against the existing local MuJoCo build and passed all three tests.
 
 ## Measured results
 

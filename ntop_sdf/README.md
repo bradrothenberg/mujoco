@@ -24,6 +24,16 @@ ctest --test-dir build-ntop-sdf --output-on-failure
 ./build-ntop-sdf/ntop_sdf_accuracy.exe
 ```
 
+To make a fresh checkout of the integration branch:
+
+```powershell
+cd "D:\nTop"
+git clone --branch ntop-sdf https://github.com/bradrothenberg/mujoco.git
+cd "D:\nTop\mujoco"
+```
+
+Use a different destination if `D:\nTop\mujoco` already exists.
+
 On another platform, select an installed C++20 compiler and generator. A
 multi-configuration generator also needs `--config Release` for build and test.
 
