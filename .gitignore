@@ -17,6 +17,7 @@
 # Exclude temporary folders
 *.egg-info/
 build/
+build-*/
 build_cmake/
 build_host/
 build_wasm/
