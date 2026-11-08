@@ -69,6 +69,9 @@ class World {
   World& operator=(const World&) = delete;
   std::size_t add(const BodyDesc& body);
   void gravity(Vec3 g);
+  // Distances are in world units. Configure these for small parts before
+  // stepping. This also selects the unsmoothed contact objective.
+  void collision_settings(double margin, double allowed_penetration, double tolerance);
   void set_pose(std::size_t id, Vec3 position, Quaternion rotation);
   void set_velocity(std::size_t id, Vec3 linear, Vec3 angular);
   void step(double seconds);

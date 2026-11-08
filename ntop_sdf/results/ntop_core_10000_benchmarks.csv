@@ -1,0 +1,4 @@
+engine,dynamic_bodies,static_bodies,hz,warmup_steps,measured_steps,substeps,solver_iterations,sdf_initpoints,sdf_iterations,margin,mean_total_step_ms,mean_broad_ms,mean_narrow_ms,mean_constraint_ms,mean_last_substep_contacts,mean_generated_contacts_per_step,field_queries_per_generated_contact,min_body_y,max_body_y,max_speed,peak_working_set_bytes
+mujoco_native,10000,1,60,10,20,4,20,40,20,0.005,163.14261,6.06251001,5.384695,100.331685,10000,,,0.509932068,0.509932068,2.89990733e-07,176205824
+mujoco_cached,10000,1,60,10,20,4,20,40,20,0.005,1033.39106,12.426645,512.39599,361.312025,30072.9,120717.1,64.7800999,0.5095896,0.509940547,0.0403045748,424521728
+mujoco_core,10000,1,60,10,20,4,20,40,20,0.005,1511.56499,11.774395,1025.68339,329.984725,29986.45,120568.95,79.4354243,0.509696334,0.509936436,0.0319553595,425574400

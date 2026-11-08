@@ -12,6 +12,7 @@
 #include <cfloat>
 #include <cstdio>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <SDL.h>
@@ -31,6 +32,9 @@
 
 #include "gl.h"
 #include "scenes.h"
+#ifdef NTOP_SDF_WITH_CORE
+#include "../tools/utf8_argv.hpp"
+#endif
 
 SDL_Window *window = nullptr;
 SDL_GLContext context = nullptr;
@@ -104,15 +108,22 @@ void openImportDialog()
 #if defined(__EMSCRIPTEN__)
     openFilePicker();
 #elif defined(_WIN32)
-    char path[MAX_PATH] = "";
-    OPENFILENAMEA dialog = {};
+    wchar_t path[32768] = L"";
+    OPENFILENAMEW dialog = {};
     dialog.lStructSize = sizeof(dialog);
-    dialog.lpstrFilter = "Wavefront OBJ (*.obj)\0*.obj\0All files\0*.*\0";
+    dialog.lpstrFilter = L"nTop implicit (*.implicit)\0*.implicit\0All files\0*.*\0";
     dialog.lpstrFile = path;
-    dialog.nMaxFile = MAX_PATH;
+    dialog.nMaxFile = static_cast<DWORD>(sizeof(path)/sizeof(path[0]));
     dialog.Flags = OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-    if (GetOpenFileNameA(&dialog))
-        pendingImport = path;
+    if (GetOpenFileNameW(&dialog)) {
+        int count=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path,-1,nullptr,0,nullptr,nullptr);
+        if(count>0) {
+            std::string utf8(static_cast<std::size_t>(count),'\0');
+            if(WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path,-1,utf8.data(),count,nullptr,nullptr)>0) {
+                utf8.pop_back(); pendingImport=std::move(utf8);
+            }
+        }
+    }
 #else
     showImportPath = true;
 #endif
@@ -126,7 +137,7 @@ void processImport()
         return;
     if (!announced)
     {
-        status = "Baking the voxel SDF of " + pendingImport.substr(pendingImport.find_last_of("/\\") + 1) + "...";
+        status = "Loading nTop implicit and preparing its display...";
         announced = true;
         return;
     }
@@ -138,10 +149,11 @@ void processImport()
     {
         double seconds = (SDL_GetPerformanceCounter() - start) / (double)SDL_GetPerformanceFrequency();
         char text[256];
-        snprintf(text, sizeof(text), "Imported %s (baked in %.2f s). %s", name.c_str(), seconds, error.c_str());
+        snprintf(text, sizeof(text), "Imported %s in %.2f s. %s", name.c_str(), seconds, error.c_str());
         status = text;
+        selectedBody = nullptr;
         dropShape = name;
-        buildPile(solver, camera, name);
+        buildImportedScene(solver, camera, name);
     }
     else
         status = "Import failed: " + error;
@@ -263,6 +275,15 @@ void ui()
     ImGui::SliderFloat("New body scale", &dropScale, 0.2f, 3.0f);
     if (ImGui::Button("Drop Shape"))
         dropSelectedShape();
+#ifdef NTOP_SDF_WITH_CORE
+    ImGui::SameLine();
+    if (ImGui::Button("Open .implicit")) openImportDialog();
+    if (showImportPath) {
+        ImGui::InputText("File", importPath, sizeof(importPath));
+        if (ImGui::Button("Load file")) { pendingImport=importPath; showImportPath=false; }
+    }
+    if (!status.empty()) ImGui::TextWrapped("%s", status.c_str());
+#endif
     if (selectedBody && ImGui::CollapsingHeader("Selected body"))
     {
         if (ImGui::DragFloat3("Position", &selectedBody->position.x, 0.02f))
@@ -425,7 +446,7 @@ void mainLoop()
 #endif
 }
 
-int main(int, char *[])
+int main(int argc, char *argv[])
 {
 #ifdef _WIN32
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
@@ -510,6 +531,9 @@ int main(int, char *[])
     loadScene(scene >= 0 && scene < sceneCount ? scene : 0);
 #else
     loadScene(0);
+#ifdef NTOP_SDF_WITH_CORE
+    if(argc>1) pendingImport=ntop_path_argument(1,argv[1]);
+#endif
 #endif
     lastCounter = SDL_GetPerformanceCounter();
 

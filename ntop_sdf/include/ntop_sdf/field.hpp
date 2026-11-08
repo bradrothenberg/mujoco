@@ -18,6 +18,8 @@ class Field {
   virtual Bounds bounds() const = 0;
   virtual double value(Vec3 p) const = 0;
   virtual Vec3 gradient(Vec3 p) const;
+  // Evaluators that provide both results in one query can override this.
+  virtual double value_gradient(Vec3 p, Vec3& gradient) const;
   virtual bool exact_distance() const { return false; }
   virtual bool convex() const { return false; }
   virtual void values(std::span<const Vec3> points, std::span<double> out) const;

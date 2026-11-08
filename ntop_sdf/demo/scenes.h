@@ -33,8 +33,10 @@ ShapePtr getShape(const std::string &name);
 // Names of all analytic shapes that can be dropped into a scene.
 std::vector<std::string> shapeNames();
 
-// Mesh import is disabled.
+// When built with nTop Core, imports a .implicit file. Collision uses its
+// field. A separate display mesh is generated for the renderer.
 bool importShape(const std::string &path, std::string &name, std::string &error);
+void buildImportedScene(Solver &solver, Camera &camera, const std::string &shape);
 
 // Adds a body of the given shape to the solver
 Body *spawn(Solver &solver, const std::string &shape, float3 position, quat orientation = {0, 0, 0, 1}, float scale = 1.0f);

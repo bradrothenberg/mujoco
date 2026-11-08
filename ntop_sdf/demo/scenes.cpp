@@ -9,8 +9,10 @@
  * It is provided "as is" without express or implied warranty.
  */
 
+#include <algorithm>
 #include <cctype>
 #include <map>
+#include <stdexcept>
 
 #include <SDL.h>
 
@@ -19,6 +21,10 @@
 static std::map<std::string, ShapePtr> library;
 static std::vector<std::string> imported;
 static Random sceneRandom;
+
+#ifdef NTOP_SDF_WITH_CORE
+ShapePtr importNtopImplicit(const std::string &path, std::string &message);
+#endif
 
 static std::string assetPath(const std::string &file)
 {
@@ -83,13 +89,24 @@ std::vector<std::string> shapeNames()
 {
     std::vector<std::string> names = {"Box", "Sphere", "Capsule", "Cylinder", "Cone", "Torus", "Plank", "Bent Plank",
                                       "Twisted Plank", "Displaced Plank", "Spike Plate", "Spiky Wheel"};
+    names.insert(names.end(), imported.begin(), imported.end());
     return names;
 }
 
 bool importShape(const std::string &path, std::string &name, std::string &error)
 {
-    error = "Mesh import is disabled in the implicit collision demo.";
+#ifdef NTOP_SDF_WITH_CORE
+    try {
+        auto shape=importNtopImplicit(path,error);
+        name="nTop implicit";
+        library[name]=std::move(shape);
+        if(std::find(imported.begin(),imported.end(),name)==imported.end()) imported.push_back(name);
+        return true;
+    } catch(const std::exception& e) { error=e.what(); return false; }
+#else
+    error = "Build the viewer with NTOP_CORE_ROOT to import nTop implicits.";
     return false;
+#endif
 }
 
 // Muted pastel colors similar to the renderings in the paper
@@ -272,6 +289,14 @@ void buildPile(Solver &solver, Camera &camera, const std::string &shape)
         for (int z = 0; z < 3; z++)
             for (int x = 0; x < 3; x++)
                 spawn(solver, shape, {(x - 1.0f) * 1.3f, 1.0f + layer * 1.3f, (z - 1.0f) * 1.3f}, sceneRandom.orientation());
+}
+
+void buildImportedScene(Solver &solver, Camera &camera, const std::string &shape)
+{
+    begin(solver, camera, {0, 1.2f, 0}, 8);
+    solver.params.epsilon=0;
+    solver.params.tolerance=0.001f;
+    spawn(solver, shape, {0, 2.0f, 0});
 }
 
 const Scene scenes[] = {

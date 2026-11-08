@@ -23,6 +23,11 @@ technical writing without emojis or em dashes.
 
 - `include/ntop_sdf/field.hpp` defines the evaluator and batch interface.
   `src/field.cpp` implements primitives and implicit operators.
+- `src/ntop_core.cpp` and `include/ntop_sdf/ntop_core.hpp` connect exported
+  `.implicit` bodies to the documented nTop Core C SDK. The optional SDK
+  dependency is supplied by the user through `NTOP_CORE_ROOT`. Do not commit
+  the SDK, its sample assets, or private nTop models. The adapter serializes
+  SDK calls because the SDK thread-safety contract is not documented here.
 - `world.hpp` and `src/world.cpp` adapt the Giles and Andrews solver, expose
   rigid bodies and persistent pair queries, and validate callback results.
 - `vendor/giles` retains the upstream license and adapted collision/solver
@@ -33,10 +38,14 @@ technical writing without emojis or em dashes.
   lifetime rules before changing this integration.
 - MuJoCo's `src/user/user_mesh.cc`, `user_objects.cc`, and `user_objects.h`
   carry the provider's conservative SDF bounds into collision geometry.
-- `demo` is a display-mesh viewer with analytic collision fields. Mesh import
-  and voxel SDF collision are disabled. It is not an elastic-body viewer.
+- `demo` displays analytic shapes and, when the SDK is available, nTop
+  implicits. Display meshes never enter collision queries. OBJ import and
+  voxel SDF collision are disabled. It is not an elastic-body viewer.
 - `tests`, `bench`, `scripts`, and `results` contain regressions, executable
   measurements, a reproduction script, and recorded CSV files.
+- `tools/ntop_core_info.cpp` inspects an exported field. The optional
+  `tools/ntop_mujoco_run.cpp` drops one exported body in MuJoCo. It estimates
+  mass properties by coarse field sampling and accepts a caller-set density.
 
 Build and test commands and known limitations are in `README.md` and
 `REPORT.md`. The current MuJoCo integration requires explicit field bounds,

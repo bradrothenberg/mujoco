@@ -1,8 +1,8 @@
 # Native implicit geometry physics specification
 
-The goal is to evaluate nTop-style implicit geometry in interactive physics. The
+The goal is to evaluate nTop implicit geometry in interactive physics. The
 external integration boundary accepts field values, optional gradients, and
-conservative bounds. It must not assume a proprietary nTop API. Collision
+conservative bounds. Use documented nTop SDK APIs and do not invent APIs. Collision
 detection must query implicit fields directly. Display meshes are allowed.
 
 The requested milestones are: reproduce the unmodified Giles and Andrews demo;
@@ -14,7 +14,7 @@ commits, exact build commands, raw benchmark measurements, and limitations.
 Use Release builds, deterministic inputs, small tests before large benchmarks,
 and measured results. Never report collision-only time as full-step time. If
 deformation is not robust, prioritize validated rigid-body results. Do not
-claim an nTop connection until a real evaluator has been integrated.
+claim elastic deformation without a working elastic model and contact feedback.
 
 ## Current implementation
 
@@ -25,8 +25,12 @@ claim an nTop connection until a real evaluator has been integrated.
 - The fork uses provider bounds for plugin SDF broad phase. The attached
   collider rejects mesh, plane, height-field, ellipsoid, other SDF-plugin, and
   flex pairs that are not implemented in the mesh-free path.
-- Elastic deformation, GPU evaluation, continuous collision detection, and a
-  real nTop evaluator are not implemented. Do not describe them as complete.
-- The diagnostic viewer uses the standalone solver and analytic primitives.
-  Its render meshes are display-only. The viewer does not visualize callbacks
-  or elastic deformation.
+- An optional nTop Core adapter imports real `.implicit` files. It exposes
+  values, derivatives, conservative bounds, and SDK batch queries. The SDK
+  and nTop sample assets remain outside source control.
+- Tests cover nTop Core 5.50.2 sphere and gyroid files, including 5 mm MuJoCo
+  drops and a standalone sphere drop. Test other SDK versions and models.
+- The viewer imports `.implicit` files and normalizes their size for the scene.
+  Its surface is display-only. Collision queries use the nTop field.
+- Elastic deformation, GPU evaluation, and continuous collision detection are
+  not implemented. Do not describe them as complete.

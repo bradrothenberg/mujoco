@@ -1,4 +1,8 @@
 #include "ntop_sdf/mujoco_plugin.hpp"
+#ifdef NTOP_SDF_WITH_CORE
+#include "ntop_sdf/ntop_core.hpp"
+#include "../tools/utf8_argv.hpp"
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -36,12 +40,22 @@ int main(int argc,char** argv) {
   std::string mode=argc>5?argv[5]:"native";
   int initpoints=argc>6?std::atoi(argv[6]):40, sdf_iterations=argc>7?std::atoi(argv[7]):20;
   double margin=argc>8?std::strtod(argv[8],nullptr):0;
-  if(count<1||warmup<0||steps<1||hz<1||initpoints<1||sdf_iterations<1||!std::isfinite(margin)||margin<0||(mode!="native"&&mode!="field"&&mode!="cached")) {
-    std::cerr<<"usage: mujoco_bench [bodies>0] [warmup>=0] [steps>0] [hz>0] [native|field|cached] [sdf_initpoints] [sdf_iterations] [margin]\n"; return 1;
+  if(count<1||warmup<0||steps<1||hz<1||initpoints<1||sdf_iterations<1||!std::isfinite(margin)||margin<0||
+     (mode!="native"&&mode!="field"&&mode!="cached"&&mode!="core") || (mode=="core"&&argc<10)) {
+    std::cerr<<"usage: mujoco_bench [bodies>0] [warmup>=0] [steps>0] [hz>0] [native|field|cached|core] [sdf_initpoints] [sdf_iterations] [margin] [core.implicit]\n"; return 1;
   }
   std::uint64_t field_id=0;
   if(mode!="native") {
-    ntop_sdf::register_mujoco_plugin(); field_id=ntop_sdf::register_mujoco_field(ntop_sdf::sphere(.5));
+    ntop_sdf::FieldPtr field;
+    if(mode=="core") {
+#ifdef NTOP_SDF_WITH_CORE
+      try { field=ntop_sdf::load_ntop_core_implicit(ntop_path_argument(9,argv[9]),100); }
+      catch(const std::exception& e) { std::cerr<<e.what()<<'\n';return 1; }
+#else
+      std::cerr<<"core mode requires NTOP_CORE_ROOT at build time\n";return 1;
+#endif
+    } else field=ntop_sdf::sphere(.5);
+    ntop_sdf::register_mujoco_plugin(); field_id=ntop_sdf::register_mujoco_field(field);
   }
   const int side=static_cast<int>(std::ceil(std::sqrt(static_cast<float>(count))));
   const float half=side*.525f+2;
@@ -63,7 +77,7 @@ int main(int argc,char** argv) {
   char error[1024]{}; mjModel* model=mj_loadXML("benchmark.xml",&vfs,error,sizeof(error)); mj_deleteVFS(&vfs);
   if(!model) {std::cerr<<error<<'\n';return 1;}
   mjData* data=mj_makeData(model); if(!data) {std::cerr<<"mj_makeData failed\n";return 1;}
-  if(mode=="cached") ntop_sdf::attach_mujoco_collision(model,data);
+  if(mode=="cached"||mode=="core") ntop_sdf::attach_mujoco_collision(model,data);
   mjcb_time=clock_ms;
   for(int i=0;i<warmup;i++) for(int k=0;k<4;k++) mj_step(model,data);
   auto before=ntop_sdf::mujoco_collision_statistics(data);
@@ -83,10 +97,10 @@ int main(int argc,char** argv) {
   std::cout<<std::setprecision(9)<<"mujoco_"<<mode<<','<<count<<",1,"<<hz<<','<<warmup<<','<<steps<<",4,20,"<<initpoints<<','<<sdf_iterations<<','<<margin<<','
     <<elapsed/steps<<','<<data->timer[mjTIMER_COL_BROAD].duration/steps<<','<<data->timer[mjTIMER_COL_NARROW].duration/steps<<','
     <<data->timer[mjTIMER_CONSTRAINT].duration/steps<<','<<contacts/steps<<',';
-  if(mode=="cached") std::cout<<static_cast<double>(generated)/steps<<','<<(generated?static_cast<double>(queries)/generated:0);
+  if(mode=="cached"||mode=="core") std::cout<<static_cast<double>(generated)/steps<<','<<(generated?static_cast<double>(queries)/generated:0);
   else std::cout<<',';
   std::cout<<','<<min_y<<','<<max_y<<','<<max_speed<<','<<peak_memory_bytes()<<'\n';
-  if(mode=="cached") {
+  if(mode=="cached"||mode=="core") {
     if(ntop_sdf::mujoco_collision_failures(data)) {std::cerr<<"cached collision failed\n";return 1;}
     ntop_sdf::detach_mujoco_collision(data);
   }

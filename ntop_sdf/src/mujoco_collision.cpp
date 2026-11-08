@@ -44,9 +44,9 @@ struct ProxyShape final : Shape {
   }
   float sdf(float3 p,float3* grad=nullptr) const override {
     ++*queries;
-    auto x=dv(p); double f=field->value(x); Vec3 g{};
+    auto x=dv(p); double f; Vec3 g{};
     if(grad || !field->exact_distance()) {
-      g=field->gradient(x);
+      f=field->value_gradient(x,g);
       if(!std::isfinite(g.x)||!std::isfinite(g.y)||!std::isfinite(g.z))
         throw std::domain_error("non-finite SDF gradient");
       if(!field->exact_distance()) {
@@ -60,7 +60,7 @@ struct ProxyShape final : Shape {
         if(!std::isfinite(grad->x)||!std::isfinite(grad->y)||!std::isfinite(grad->z))
           throw std::domain_error("SDF gradient exceeds single-precision range");
       }
-    }
+    } else f=field->value(x);
     float value=static_cast<float>(f);
     if(!std::isfinite(value)) throw std::domain_error("SDF value exceeds single-precision range");
     return value;
@@ -74,7 +74,7 @@ struct PairState {
 };
 using ShapeKey=std::tuple<int,int,double,double,double>;
 struct Cache {
-  explicit Cache(const mjModel* m) : model(m) {}
+  explicit Cache(const mjModel* m) : model(m) { params.epsilon=0; }
   const mjModel* model;
   std::mutex mutex;
   std::map<ShapeKey,std::shared_ptr<ProxyShape>> shapes;
@@ -160,11 +160,15 @@ int collide(const mjModel* m,mjData* d,mjPreContact* con,int g1,int g2,mjtNum ma
     update_body(*pair.a,m,d,g1); update_body(*pair.b,m,d,g2);
     float dt=pair.last_time>=0&&d->time>pair.last_time?static_cast<float>(d->time-pair.last_time):0;
     pair.last_time=d->time;
-    cache->params.margin=static_cast<float>(std::max(mjtNum(0),margin));
-    if(!overlaps(expand(pair.a->bounds,cache->params.margin*.5f),expand(pair.b->bounds,cache->params.margin*.5f))) {
+    auto params=cache->params;
+    const float scale=std::min(maxComponent(size(pair.a->shape->bounds)),maxComponent(size(pair.b->shape->bounds)));
+    params.tolerance=std::min(params.tolerance,scale*1e-4f);
+    params.replacementThreshold=std::min(params.replacementThreshold,scale*.01f);
+    params.margin=static_cast<float>(std::max(mjtNum(0),margin));
+    if(!overlaps(expand(pair.a->bounds,params.margin*.5f),expand(pair.b->bounds,params.margin*.5f))) {
       pair.manifold.points.clear(); return 0;
     }
-    CollisionStats stats; pair.manifold.update(cache->params,dt,cache->rng,stats);
+    CollisionStats stats; pair.manifold.update(params,dt,cache->rng,stats);
     int n=0, limit=std::min(mjMAXCONPAIR,std::max(0,m->opt.sdf_initpoints));
     for(const auto& p:pair.manifold.points) if(p.active && n<limit) {
       con[n].dist=p.separation;

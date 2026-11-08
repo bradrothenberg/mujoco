@@ -114,6 +114,10 @@ class Composite final : public Field {
     }
     return Field::gradient(p);
   }
+  double value_gradient(Vec3 p,Vec3& g) const override {
+    if(op_==Op::translate) return a_->value_gradient({p.x-p_.x,p.y-p_.y,p.z-p_.z},g);
+    return Field::value_gradient(p,g);
+  }
  private:
   Op op_; FieldPtr a_, b_; Vec3 p_; Bounds bounds_;
 };
@@ -132,6 +136,11 @@ Vec3 Field::gradient(Vec3 p) const {
                   {p.x,p.y-h,p.z},{p.x,p.y,p.z+h},{p.x,p.y,p.z-h}};
   double f[6]{}; values(q,f);
   return {(f[0]-f[1])/(2*h),(f[2]-f[3])/(2*h),(f[4]-f[5])/(2*h)};
+}
+double Field::value_gradient(Vec3 p, Vec3& g) const {
+  const double v = value(p);
+  g = gradient(p);
+  return v;
 }
 void Field::values(std::span<const Vec3> p, std::span<double> out) const {
   if (p.size()!=out.size()) throw std::invalid_argument("batch sizes differ");

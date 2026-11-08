@@ -8,10 +8,71 @@ solver. It can also send those contacts to MuJoCo. The tests and measurements
 do not establish performance parity with MuJoCo's analytic primitive collider.
 They do not establish robust contact for arbitrary non-convex fields.
 
+An optional adapter now reads nTop `.implicit` exports through nTop Core. The
+5 mm sphere and gyroid samples passed rigid contact tests in MuJoCo. The
+diagnostic viewer also loads the gyroid and displays its contact points.
+
 The elastic-deformation stage is not implemented. There is no inverse
 deformation map, elastic material model, deformable contact feedback, or soft
 body demo. The results cannot answer whether elastic implicit solids run at
-interactive rates. There is no connection to an nTop evaluator yet.
+interactive rates.
+
+## nTop Core validation and performance
+
+The test runtime was nTop Core 5.50.2. The adapter calls its documented C API
+for import, bounds, values, derivatives, and array queries. It preserves nTop's
+metre units by default. It releases each SDK handle when the field is destroyed.
+Calls are serialized while the SDK's thread-safety contract is unconfirmed.
+The standalone solver's collision settings can be set for small parts. The
+MuJoCo cached collider now scales its optimizer tolerance to the smaller body.
+
+The SDK sphere fixture has a 5 mm radius. Its SHA-256 is
+`36d6b75fc8e1b6faaa2f5549d6d56a4b0cfcbacaad8ce079f07d858c152e25c8`.
+The tests check its field, gradient, bounds, scale, batch results, sampled mass,
+and 1 mm overlap with another sphere. They also run a standalone floor drop.
+Other tests translate the sphere away from its field origin and rotate it
+before the MuJoCo drop. Both tests check the world-space center of mass.
+In MuJoCo the sphere starts 1 mm above a box floor. After 1 second, its center
+is at 5.007 mm and its speed is below the test limit. A 0.5 mm initial
+penetration is checked against the expected normal and separation.
+
+The SDK gyroid sphere fixture has SHA-256
+`6224d8d2140706f016579bc30eaaa0675cc8e7a0794da33cedf6160a8f59eec1`.
+It settled at a center height of 4.895 mm in the same 1 second MuJoCo drop.
+Its non-unit gradients exercise the local distance correction. The 1.5 mm
+settling tolerance is a smoke-test limit, not a proof of accurate gyroid
+contact. The viewer displays a separately generated surface. Its collider
+queries nTop Core directly. Twelve other local exports also opened and were
+queried, but those checks did not simulate them.
+
+The following CPU measurements use the SDK sphere scaled 100 times to match
+MuJoCo's 0.5 m analytic sphere. The box floor, initial positions, mass,
+friction, gravity, timestep, four substeps, 20 solver iterations, 10 warmup
+steps, and 20 measured steps match. Both geoms have a 0.005 m contact margin.
+The native collider produces one contact per sphere; the SDF collider produces
+about three in the 60 Hz cases. Thus, the results include both evaluator and
+contact-manifold differences. They measure complete steps, not rendering or
+model compilation. The machine was not isolated or CPU-pinned.
+
+| Dynamic spheres | Native MuJoCo, 60 Hz step | nTop Core SDF, 60 Hz step |
+| ---: | ---: | ---: |
+| 10 | 0.135 ms | 1.548 ms |
+| 100 | 1.188 ms | 12.807 ms |
+| 1,000 | 10.241 ms | 145.427 ms |
+| 10,000 | 163.143 ms | 1,511.565 ms |
+
+At 100 spheres, the nTop Core path averaged 14.576 ms at 120 Hz and 19.130 ms
+at 240 Hz. Those values exceed the 8.33 ms and 4.17 ms step budgets. The
+10,000-body nTop process peaked at 425,574,400 bytes of working set, including
+setup. The native process peaked at 176,205,824 bytes. See the raw
+[10 to 1,000 body results](results/ntop_core_sphere_benchmarks.csv) and
+[10,000 body results](results/ntop_core_10000_benchmarks.csv).
+
+These results show feasible direct rigid contact for the tested small scenes.
+They do not establish parity with MuJoCo, robust arbitrary implicit contact,
+deformation, or GPU performance. The optimizer issues scalar SDK calls even
+though the adapter exposes the SDK's batch interface. Thin features, deep
+penetration, continuous collision, and zero-gradient points still need study.
 
 ## Method and integration boundary
 
@@ -56,8 +117,9 @@ registered again before the model is reloaded.
 
 ## Correctness checks
 
-The Release CTest suite has three executables when the MuJoCo adapter is
-enabled. A standalone-only build has two. The standalone tests cover
+The Windows Release CTest suite has twelve cases when both MuJoCo and nTop Core
+are enabled. Two cases check Unicode paths. A standalone-only build has two.
+The standalone tests cover
 primitive and warped-field gradients, a batched callback with finite
 differences, sphere/sphere and sphere/box-floor contacts at zero gap and in
 penetration, a deeper sphere overlap, cached pair queries, torus contact and
@@ -79,7 +141,12 @@ approximately 0.00621 length units, and the largest normal error is about
 0.995 degrees. Each case reports its own result. These numbers do not bound
 errors for arbitrary shapes or feature sizes.
 
-## Benchmark method
+## Earlier benchmark method
+
+The following measurements were taken before the nTop Core integration and
+the smaller-scale collision tolerance changes. They are historical results
+from the previous working milestone. Use the nTop Core results above for the
+current comparison.
 
 Measurements used an Intel Core Ultra 7 165H with 22 logical processors on
 Windows 10.0.26200. The machine also has an NVIDIA RTX 5000 Ada Generation
@@ -173,9 +240,10 @@ measurements. No GPU timings are available.
 - Restitution, friction, and stability have only the bounded tests above.
 - Contact caches can grow with recently active pairs and serialize callbacks
   for a MuJoCo data instance. They are not a parallel SDF backend.
-- The viewer shows analytic rigid-body scenes. It does not show callback fields
-  or elastic deformation. A visual check covered the sphere/torus scene,
-  contact normals, body selection, and the transform controls.
+- The viewer shows analytic and nTop Core rigid-body scenes. It does not show
+  arbitrary caller callbacks or elastic deformation. Visual checks covered
+  the sphere/torus scene, an nTop gyroid, contact normals, body selection, and
+  the transform controls.
 - The tests do not cover every MuJoCo model feature, platform, scale, unit
   convention, or arbitrary user callback. Check the failure counter and
   validate each application.

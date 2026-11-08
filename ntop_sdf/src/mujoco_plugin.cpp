@@ -34,11 +34,11 @@ Vec3 point(const mjtNum p[3]) { return {p[0],p[1],p[2]}; }
 FieldPtr* data(const mjData* d,int instance) { return reinterpret_cast<FieldPtr*>(d->plugin_data[instance]); }
 double safe_value(const FieldPtr& f,Vec3 x,bool corrected) noexcept {
   try {
-    double v=f->value(x);
+    double v;
     if(corrected&&!f->exact_distance()) {
-      auto g=f->gradient(x); double n=std::sqrt(g.x*g.x+g.y*g.y+g.z*g.z);
+      Vec3 g{}; v=f->value_gradient(x,g); double n=std::sqrt(g.x*g.x+g.y*g.y+g.z*g.z);
       if(std::isfinite(n)&&n>1e-12) v/=n;
-    }
+    } else v=f->value(x);
     return std::isfinite(v)?v:mjMAXVAL;
   } catch (...) { return mjMAXVAL; }
 }

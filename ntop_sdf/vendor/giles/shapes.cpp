@@ -438,7 +438,9 @@ void Shape::finalize()
         }
     }
 
-    volume = max((float)mass, 1e-6f);
+    // Do not clamp volume to an absolute size: nTop models commonly use mm.
+    // The adapter rejects an empty or non-representable sampled interior.
+    volume = (float)mass;
     for (int i = 0; i < 3; i++)
         centerOfMass[i] = mass > 0 ? (float)(first[i] / mass) : center(bounds)[i];
 

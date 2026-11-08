@@ -39,14 +39,13 @@ struct FieldShape final : Shape {
     // Shape::finalize samples the field for volume, inertia and seed points.
     // It does not use or generate a surface mesh for this adapter.
     finalize();
-    if (!(volume>1e-6f) || !std::isfinite(volume)) throw std::invalid_argument("field has no measurable interior");
+    if (!(volume>0) || !std::isfinite(volume)) throw std::invalid_argument("field has no measurable interior");
   }
   float sdf(float3 p, float3* grad=nullptr) const override {
     ++queries;
-    Vec3 x=as_vec(p); double v=field->value(x);
-    Vec3 g{};
+    Vec3 x=as_vec(p); Vec3 g{}; double v;
     if (grad || !field->exact_distance()) {
-      g=field->gradient(x);
+      v=field->value_gradient(x,g);
       if (!finite(g)) throw std::domain_error("field returned a non-finite gradient");
       if (!field->exact_distance()) {
         double n=std::hypot(g.x,g.y,g.z);
@@ -55,7 +54,7 @@ struct FieldShape final : Shape {
         else { ++degeneracies; g={0,1,0}; }
       }
       if (grad) *grad=as_float(g);
-    }
+    } else v=field->value(x);
     if (!std::isfinite(v)) throw std::domain_error("field returned a non-finite value");
     return checked_float(v);
   }
@@ -80,7 +79,8 @@ struct PairQuery::Impl {
     a=std::make_unique<Body>(a_shape,float3{0,0,0},quat{0,0,0,1},1,true);
     b=std::make_unique<Body>(b_shape,float3{0,0,0},quat{0,0,0,1},1,true);
     manifold.bodyA=a.get(); manifold.bodyB=b.get();
-    params.tolerance=1e-4f; params.epsilon=0; params.maxIterations=150;
+    const float scale=std::min(maxComponent(size(a_shape->bounds)),maxComponent(size(b_shape->bounds)));
+    params.tolerance=std::min(1e-4f,scale*1e-4f); params.epsilon=0; params.maxIterations=150;
   }
 };
 PairQuery::PairQuery(FieldPtr a,FieldPtr b) : impl_(std::make_unique<Impl>(std::move(a),std::move(b))) {}
@@ -152,6 +152,17 @@ std::size_t World::add(const BodyDesc& desc) {
   return impl_->solver.bodies.size()-1;
 }
 void World::gravity(Vec3 g) { if(!finite(g)) throw std::invalid_argument("invalid gravity"); impl_->solver.gravity=as_float(g); }
+void World::collision_settings(double margin,double allowed,double tolerance) {
+  if(!std::isfinite(margin)||!std::isfinite(allowed)||!std::isfinite(tolerance)||
+     margin<0||allowed<0||allowed>margin||tolerance<=0)
+    throw std::invalid_argument("invalid collision settings");
+  const float m=checked_float(margin),a=checked_float(allowed),t=checked_float(tolerance);
+  if((margin>0&&!(m>0))||(allowed>0&&!(a>0))||!(t>0))
+    throw std::invalid_argument("collision setting is below single-precision range");
+  auto& p=impl_->solver.params;
+  p.margin=m; p.allowedPenetration=a; p.tolerance=t; p.epsilon=0;
+  p.replacementThreshold=std::min(0.01f,std::max(p.tolerance,p.margin*.5f));
+}
 void World::set_pose(std::size_t id, Vec3 position, Quaternion rotation) {
   double q2=rotation.x*rotation.x+rotation.y*rotation.y+rotation.z*rotation.z+rotation.w*rotation.w;
   if(!finite(position)||!std::isfinite(q2)||q2<1e-20) throw std::invalid_argument("invalid pose");
